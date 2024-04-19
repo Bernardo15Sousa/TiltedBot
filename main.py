@@ -3,11 +3,12 @@
 import discord
 import os
 import platform
-import pathlib
 import random
+import requests
 from discord.ext import commands
 
 TOKEN = os.getenv("TOKEN")
+VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
 PREFIX = "!"
 
 bot = commands.Bot(command_prefix=PREFIX, case_insensitive=True, help_command=None)
@@ -27,9 +28,49 @@ async def prefix(ctx, new_prefix):
 
 @bot.command(help="Get a random greeting.")
 async def hello(ctx):
-    greetings = ["Hello!", "Hi there!", "Hey!", "Greetings!", "Hola!"]
+    greetings = ["Hello!", "Sup G", "Hey!", "Buenas!", "Howdy!"]
     greeting = random.choice(greetings)
     await ctx.send(greeting)
+
+@bot.command(help="Pick a game to play.")
+async def jogo(ctx):
+    games = ["NFS Heat", "GTA", "Formula 1", "Rocket League", "Fortnite", "Bloons TD6"]
+    game = random.choice(games)
+    await ctx.send(game)
+
+@bot.event
+async def on_message(message):
+    if "nosso" in message.content.lower():
+        await message.channel.send("☭")
+
+    # Check for links in the message content
+    for word in message.content.split():
+        if word.startswith("http://") or word.startswith("https://"):
+            # Check if the link is malicious
+            if await is_malicious_link(word):
+                await message.delete()
+                await message.channel.send(f"Warning: The link '{word}' may be malicious and has been removed.")
+            break  # Stop checking if one link is found
+
+    await bot.process_commands(message)
+
+async def is_malicious_link(link):
+    if not VIRUSTOTAL_API_KEY:
+        print("VirusTotal API key not found.")
+        return False
+
+    url = f"https://www.virustotal.com/vtapi/v2/url/scan"
+    params = {"apikey": VIRUSTOTAL_API_KEY, "url": link}
+    response = requests.post(url, data=params)
+
+    if response.status_code == 200:
+        json_response = response.json()
+        if "positives" in json_response:
+            # If VirusTotal detects any positives (malware), consider the link malicious
+            if json_response["positives"] > 0:
+                return True
+
+    return False
 
 @bot.event
 async def on_ready():
